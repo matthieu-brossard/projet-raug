@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Protein Viewer</title>
+</head>
+<body>
+  <div id="controls">
+    <label for="protein-id">Enter Protein ID:</label>
+    <input type="text" id="protein-id" value="AF-P69905-F1-model_v1">
+    <button id="load-protein">Load Protein</button>
+  </div>
+  
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <script>
+    let scene, camera, renderer, controls;
+    //based on https://en.wikipedia.org/wiki/Bond_length
+    const bondThresholds = {
+      'H': 1.2,
+      'C': 1.6,
+      'O': 1.5,
+      'N': 1.5,
+      'S': 1.8,
+      'P': 1.8,
+      'F': 1.4,
+      'Cl': 1.8,
+      'Br': 1.9,
+      'I': 2.0,
+      'Si': 2.1, 
+      'B': 1.7,
+      'Li': 1.6,
+      'Na': 2.2,
+      'Mg': 2.0,
+      'Al': 2.0,
+      'K': 2.8,
+      'Ca': 2.4,
+      'Zn': 2.1,
+      'Fe': 2.0, 
+      'Cu': 2.0,
+      'Ag': 2.1,
+      'Au': 2.1,
+    };
+
+    function calculateDistance(atom1, atom2) {
+      const dx = atom1.x - atom2.x;
+      const dy = atom1.y - atom2.y;
+      const dz = atom1.z - atom2.z;
+      return Math.sqrt(dx * dx + dy * dy + dz * dz);
+    }
+    function placeAtom(atomMesh, atomIndex, atom) {
+        const dummy = new THREE.Object3D();
+        dummy.position.set(atom.x, atom.y, atom.z);
+        dummy.updateMatrix();
+        atomMesh.setMatrixAt(atomIndex, dummy.matrix);
+        atomMesh.instanceMatrix.needsUpdate = true;
+    }
+    function createBond(atom1, atom2, bondMesh, bondIndex) {
+        const start = new THREE.Vector3(atom1.x, atom1.y, atom1.z);
+        const end = new THREE.Vector3(atom2.x, atom2.y, atom2.z);
+
+        const bondLength = start.distanceTo(end);
+        const bondMidpoint = new THREE.Vector3().lerpVectors(start, end, 0.5);
+
+        const cylinder = new THREE.Object3D();
+
+        // Set position
+        cylinder.position.copy(bondMidpoint);
+
+        // Align the bond
+        const bondDirection = new THREE.Vector3().subVectors(end, start).normalize();
+        const up = new THREE.Vector3(0, 1, 0); 
+        const quaternion = new THREE.Quaternion().setFromUnitVectors(up, bondDirection);
+        cylinder.quaternion.copy(quaternion);
+
+        // Set scale based on the distance between the two atoms
+        let boundThickness = 1
+        cylinder.scale.set(boundThickness, bondLength , boundThickness);
+
+        cylinder.updateMatrix();
+        bondMesh.setMatrixAt(bondIndex, cylinder.matrix);
+        bondMesh.instanceMatrix.needsUpdate = true;
+    }
+
+
+    function initScene() {
+        scene = new THREE.Scene();
+        camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        renderer = new THREE.WebGLRenderer();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        const light = new THREE.DirectionalLight(0xffffff, 1);
+        light.position.set(1, 1, 1).normalize();
+        scene.add(light);
+
+        controls = new THREE.OrbitControls(camera, renderer.domElement);
+
+        camera.position.set(0, 0, 15); 
+        camera.lookAt(0, 0, 0); 
+
+        // Render the scene
+        function animate() {
+        requestAnimationFrame(animate);
+        controls.update();
+        renderer.render(scene, camera);
+        }
+        animate();
+    }
+    function parsePDB(pdbData) {
+      const lines = pdbData.split('\n');
+      const atoms = [];
+
+      lines.forEach(line => {
+        if (line.startsWith('ATOM')) {
+          const atom = {
+            x: parseFloat(line.substring(30, 38)),
+            y: parseFloat(line.substring(38, 46)),
+            z: parseFloat(line.substring(46, 54)),
+            element: line.substring(76, 78).trim()
+          };
+          atoms.push(atom);
+        }
+      });
+      return atoms;
+    }
+
+    function loadProtein(proteinID) {
+      const pdbUrl = `https://alphafold.ebi.ac.uk/files/${proteinID}.pdb`;
+      fetch(pdbUrl)
+        .then(response => {
+          if (!response.ok) {
+            throw new Error("Failed to fetch protein data.");
+          }
+          return response.text();
+        })
+        .then(data => {
+          while (scene.children.length > 0) {
+        scene.remove(scene.children[0]);
+    }
+    const atoms = parsePDB(data);
+
+    const geometry = new THREE.SphereGeometry(0.2, 32, 32);
+    const bondGeometry = new THREE.CylinderGeometry(0.05, 0.05, 1, 8);
+
+    const carbonMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00 }); 
+    const oxygenMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 }); 
+    const nitrogenMaterial = new THREE.MeshBasicMaterial({ color: 0x0000ff }); 
+    const otherMateriel = new THREE.MeshBasicMaterial({ color: 0xffffff }); 
+    const bondMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
+
+    const carbonAmount = atoms.filter(atom => atom.element == 'C').length;
+    const oxygenAmount = atoms.filter(atom => atom.element == 'O').length;
+    const nitrogenAmount = atoms.filter(atom => atom.element == 'N').length;
+    const otherAmount = atoms.length - (carbonAmount + oxygenAmount + nitrogenAmount);
+
+    const carbonMesh = new THREE.InstancedMesh(geometry, carbonMaterial, carbonAmount);
+    const oxygenMesh = new THREE.InstancedMesh(geometry, oxygenMaterial, oxygenAmount);
+    const nitrogenMesh = new THREE.InstancedMesh(geometry, nitrogenMaterial, nitrogenAmount);
+    const otherMesh = new THREE.InstancedMesh(geometry, otherMateriel, otherAmount);
+    const bondMesh = new THREE.InstancedMesh(bondGeometry, bondMaterial, atoms.length * 2);  
+	// Assuming up to 2 bonds per atom
+
+    var carbonIndex = 0;
+    var oxygenIndex = 0;
+    var nitrogenIndex = 0;
+    var otherIndex = 0;
+    var bondIndex = 0;
+
+    atoms.forEach((atom, index) => {
+        switch (atom.element) {
+            case 'C':
+                placeAtom(carbonMesh, carbonIndex, atom);
+                carbonIndex++;
+                break;
+            case 'O':
+                placeAtom(oxygenMesh, oxygenIndex, atom);
+                oxygenIndex++;
+                break;
+            case 'N':
+                placeAtom(nitrogenMesh, nitrogenIndex, atom);
+                nitrogenIndex++;
+                break;
+            default:
+                placeAtom(otherMesh, otherIndex, atom);
+                otherIndex++;
+        }
+
+        // Create bonds to all atoms within the reach of usual covalente bond lengths
+        for(let j  = index +1 ; j < atoms.length; j++)
+        {
+          const atom1 = atom
+          const atom2 = atoms[j];
+
+          const distance = calculateDistance(atom1, atom2);
+
+          const threshold1 = bondThresholds[atom1.element] || 0;
+          const threshold2 = bondThresholds[atom2.element] || 0;
+          const bondThreshold = Math.max(threshold1, threshold2);
+
+          if (distance <= bondThreshold) {
+            createBond(atom1, atom2, bondMesh, bondIndex);
+            bondIndex++;
+          }
+        }
+    });
+
+    scene.add(carbonMesh);
+    scene.add(oxygenMesh);
+    scene.add(nitrogenMesh);
+    scene.add(otherMesh);
+    scene.add(bondMesh);  
+        })
+        .catch(error => {
+          console.error('Error :', error);
+        });
+    }
+    initScene();
+    loadProtein(document.getElementById('protein-id').value);
+    document.getElementById('load-protein').addEventListener('click', () => {
+      const proteinID = document.getElementById('protein-id').value;
+      if (proteinID) {
+        loadProtein(proteinID);
+      }
+    });
+  </script>
+</body>
+</html>
