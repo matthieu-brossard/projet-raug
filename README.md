@@ -15,7 +15,7 @@ liaisons des protéines de manière interactive avec la possibilité justement d
 - Un chargement dynamique de protéines en entrant un identifiant de protéine pour charger un modèle 3D en direct depuis AlphaFold.
 - On peut visualiser les atomes et les liaisons directement en 3D avec des couleurs distinctes pour chaque 
 type d'élément chimique (carbone, oxygène, azote, etc.).
-- On peut contrôler de la vue pour explorer la structure de la protéine sous différents angles.
+- On peut contrôler la vue pour explorer la structure de la protéine sous différents angles.
 
 ## Technologies utilisées
 
