@@ -47,8 +47,6 @@ Il crée ensuite des objets 3D pour chaque atome de la protéine et les position
 
 Les modèles de protéines sont téléchargés à partir d'AlphaFold, une base de données de structures de protéines.
 
-## Rendu
-
-- Projet pour le cours Réalité Augmentée MAJEURE SANTÉ
-- Date du rendu Dimanche 3 Novembre à 13H
+## License
+[License MIT](https://fr.wikipedia.org/wiki/Licence_MIT)
 
